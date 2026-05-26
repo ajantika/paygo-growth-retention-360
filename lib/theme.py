@@ -65,17 +65,17 @@ def demo_banner() -> None:
 
 
 def fmt_money(x: float, short: bool = True) -> str:
-    """Format currency with 2 decimal places."""
+    """Format currency as a whole number."""
     if x is None:
         return "—"
     if short:
         if abs(x) >= 1_000_000:
-            return f"${x/1_000_000:.2f}M"
+            return f"${x/1_000_000:.0f}M"
         if abs(x) >= 1_000:
-            return f"${x/1_000:.2f}K"
-    return f"${x:,.2f}"
+            return f"${x/1_000:.0f}K"
+    return f"${x:,.0f}"
 
 
 def fmt_pct(x: float) -> str:
-    """Format percentage with 2 decimal places."""
-    return f"{x:.2f}%"
+    """Format percentage as a whole number."""
+    return f"{x:.0f}%"

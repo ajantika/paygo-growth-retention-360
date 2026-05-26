@@ -36,10 +36,10 @@ def render() -> None:
 
     kpi_row([
         ("Total PayGo signups", f"{total:,}", None),
-        ("Graduated to Enterprise", f"{graduated:,}", f"{grad_rate:.2f}%"),
+        ("Graduated to Enterprise", f"{graduated:,}", f"{grad_rate:.0f}%"),
         ("Churned before graduating", f"{churned_before_grad:,}", None),
         ("Median time-to-upgrade", f"{int(median_ttu)} days", None),
-        ("Median MRR jump", f"{avg_jump:.2f}x", None),
+        ("Median MRR jump", f"{avg_jump:.1f}x", None),
     ])
 
     st.divider()

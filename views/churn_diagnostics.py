@@ -28,12 +28,12 @@ def render() -> None:
     if not plan_df.empty:
         monthly_rate = plan_df.set_index("plan_type").loc["Monthly", "churn_rate_pct"] if "Monthly" in plan_df["plan_type"].values else 0
         annual_rate = plan_df.set_index("plan_type").loc["Annual", "churn_rate_pct"] if "Annual" in plan_df["plan_type"].values else 0
-        col2.metric("Monthly plan churn", f"{monthly_rate:.2f}%")
-        col3.metric("Annual plan churn", f"{annual_rate:.2f}%")
+        col2.metric("Monthly plan churn", f"{monthly_rate:.0f}%")
+        col3.metric("Annual plan churn", f"{annual_rate:.0f}%")
 
     st.info(
-        f"**Headline insight.** Annual plans churn at **{annual_rate:.2f}%** versus **{monthly_rate:.2f}%** for monthly — "
-        "a ~{:.2f}x retention advantage. Shifting plan mix is one of the highest-leverage retention levers.".format(
+        f"**Headline insight.** Annual plans churn at **{annual_rate:.0f}%** versus **{monthly_rate:.0f}%** for monthly — "
+        "a ~{:.0f}x retention advantage. Shifting plan mix is one of the highest-leverage retention levers.".format(
             (monthly_rate / annual_rate) if annual_rate else 0
         )
     )

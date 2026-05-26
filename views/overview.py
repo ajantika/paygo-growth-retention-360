@@ -62,7 +62,7 @@ def render() -> None:
             name="Retained",
             x=plan["plan_type"],
             y=plan["retained"],
-            marker_color=PALETTE[2],
+            marker_color="#34D399",   # emerald
             text=plan["retained"],
             textposition="inside",
         )
@@ -70,7 +70,7 @@ def render() -> None:
             name="Churned",
             x=plan["plan_type"],
             y=plan["churned"],
-            marker_color=PALETTE[4],
+            marker_color="#EF4444",   # red — semantically correct for churn
             text=plan["churned"],
             textposition="inside",
         )
@@ -88,13 +88,13 @@ def render() -> None:
         st.markdown("")
         for _, row in plan.iterrows():
             churn_pct = row["churn_rate_pct"]
-            color = "#F87171" if churn_pct > 20 else "#34D399"
+            color = "#EF4444" if churn_pct > 20 else "#34D399"
             st.markdown(
                 f"<div style='padding:12px 14px;margin-bottom:10px;border-radius:8px;"
                 f"background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.25);'>"
                 f"<div style='font-size:12px;color:#94A3B8;text-transform:uppercase;letter-spacing:0.05em;'>"
                 f"{row['plan_type']}</div>"
-                f"<div style='font-size:22px;font-weight:600;margin-top:4px;color:{color};'>{churn_pct:.2f}% churn</div>"
+                f"<div style='font-size:22px;font-weight:600;margin-top:4px;color:{color};'>{churn_pct:.0f}% churn</div>"
                 f"<div style='font-size:13px;color:#CBD5E1;margin-top:2px;'>"
                 f"{int(row['churned'])} churned of {int(row['total'])} total</div>"
                 f"</div>",
