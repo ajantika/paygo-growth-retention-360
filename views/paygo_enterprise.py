@@ -6,7 +6,7 @@ import plotly.express as px
 import streamlit as st
 
 from lib import data as dl
-from lib.theme import PALETTE, fmt_money, kpi_row, page_header
+from lib.theme import PALETTE, apply_plotly_theme, fmt_money, kpi_row, page_header
 
 
 def render() -> None:
@@ -36,10 +36,10 @@ def render() -> None:
 
     kpi_row([
         ("Total PayGo signups", f"{total:,}", None),
-        ("Graduated to Enterprise", f"{graduated:,}", f"{grad_rate:.1f}%"),
+        ("Graduated to Enterprise", f"{graduated:,}", f"{grad_rate:.2f}%"),
         ("Churned before graduating", f"{churned_before_grad:,}", None),
         ("Median time-to-upgrade", f"{int(median_ttu)} days", None),
-        ("Median MRR jump at graduation", f"{avg_jump:.1f}x", None),
+        ("Median MRR jump", f"{avg_jump:.2f}x", None),
     ])
 
     st.divider()
@@ -52,6 +52,7 @@ def render() -> None:
     fig = px.funnel(funnel_df, x="accounts", y="stage",
                     color_discrete_sequence=[PALETTE[0]])
     fig.update_layout(title="Graduation funnel", height=320)
+    apply_plotly_theme(fig)
     st.plotly_chart(fig, use_container_width=True)
 
     if not grads.empty:
@@ -61,6 +62,7 @@ def render() -> None:
                                 title="Time-to-upgrade distribution (days)",
                                 color_discrete_sequence=[PALETTE[1]])
             fig2.update_layout(height=320, yaxis_title="Graduated accounts")
+            apply_plotly_theme(fig2)
             st.plotly_chart(fig2, use_container_width=True)
         with col2:
             grads_disp = grads.assign(
@@ -69,11 +71,12 @@ def render() -> None:
             fig3 = px.scatter(
                 grads_disp, x="time_to_upgrade_days", y="enterprise_mrr_after",
                 size="jump", color="jump",
-                color_continuous_scale="Oranges",
+                color_continuous_scale="Purples",
                 title="Time-to-upgrade vs. Enterprise MRR (size = MRR jump)",
             )
             fig3.update_layout(height=320, yaxis_title="Enterprise MRR ($)",
                                xaxis_title="Days to upgrade")
+            apply_plotly_theme(fig3)
             st.plotly_chart(fig3, use_container_width=True)
 
         st.divider()

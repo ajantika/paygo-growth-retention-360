@@ -3,13 +3,38 @@ from __future__ import annotations
 
 import streamlit as st
 
-COLOR_PRIMARY = "#F38020"   # Cloudflare orange (warm)
-COLOR_SECONDARY = "#003682" # deep blue
-COLOR_POS = "#16A34A"
-COLOR_NEG = "#DC2626"
-COLOR_NEUTRAL = "#64748B"
+# Dark theme palette — pops on the dark navy background
+COLOR_PRIMARY = "#A78BFA"    # lavender accent (matches Customer 360 vibe)
+COLOR_SECONDARY = "#60A5FA"  # sky blue
+COLOR_POS = "#34D399"        # emerald
+COLOR_NEG = "#F87171"        # rose
+COLOR_NEUTRAL = "#94A3B8"    # slate
 
-PALETTE = [COLOR_PRIMARY, COLOR_SECONDARY, "#16A34A", "#9333EA", "#F59E0B", "#06B6D4", "#EC4899", "#64748B"]
+PALETTE = [
+    "#A78BFA",  # lavender
+    "#60A5FA",  # sky
+    "#34D399",  # emerald
+    "#FBBF24",  # amber
+    "#F472B6",  # pink
+    "#22D3EE",  # cyan
+    "#FB923C",  # orange
+    "#94A3B8",  # slate
+]
+
+# Plotly template tuned for dark theme
+PLOTLY_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#E2E8F0", family="sans-serif"),
+    xaxis=dict(gridcolor="rgba(148,163,184,0.15)", zerolinecolor="rgba(148,163,184,0.2)"),
+    yaxis=dict(gridcolor="rgba(148,163,184,0.15)", zerolinecolor="rgba(148,163,184,0.2)"),
+    legend=dict(bgcolor="rgba(0,0,0,0)"),
+)
+
+
+def apply_plotly_theme(fig):
+    fig.update_layout(**PLOTLY_LAYOUT)
+    return fig
 
 
 def page_header(title: str, subtitle: str | None = None) -> None:
@@ -29,8 +54,9 @@ def kpi_row(items: list[tuple[str, str, str | None]]) -> None:
 def demo_banner() -> None:
     st.sidebar.markdown(
         """
-        <div style='padding:10px;border-radius:6px;background:#FFF7ED;border:1px solid #FDBA74;font-size:12px;'>
-        <strong>Demo data only.</strong> 100% synthetic, generated with seed=42.
+        <div style='padding:10px;border-radius:8px;background:rgba(167,139,250,0.10);
+        border:1px solid rgba(167,139,250,0.40);font-size:12px;color:#E2E8F0;'>
+        <strong>⚠️ Demo data only.</strong> 100% synthetic, generated with seed=42.
         No real customer or revenue data.
         </div>
         """,
@@ -39,15 +65,17 @@ def demo_banner() -> None:
 
 
 def fmt_money(x: float, short: bool = True) -> str:
+    """Format currency with 2 decimal places."""
     if x is None:
         return "—"
     if short:
         if abs(x) >= 1_000_000:
             return f"${x/1_000_000:.2f}M"
         if abs(x) >= 1_000:
-            return f"${x/1_000:.1f}K"
-    return f"${x:,.0f}"
+            return f"${x/1_000:.2f}K"
+    return f"${x:,.2f}"
 
 
 def fmt_pct(x: float) -> str:
-    return f"{x:.1f}%"
+    """Format percentage with 2 decimal places."""
+    return f"{x:.2f}%"

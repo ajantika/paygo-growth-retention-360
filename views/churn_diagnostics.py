@@ -7,7 +7,7 @@ import streamlit as st
 
 from lib import data as dl
 from lib import metrics
-from lib.theme import COLOR_NEG, COLOR_NEUTRAL, COLOR_POS, PALETTE, fmt_money, fmt_pct, page_header
+from lib.theme import COLOR_NEG, COLOR_NEUTRAL, COLOR_POS, PALETTE, apply_plotly_theme, fmt_money, fmt_pct, page_header
 
 
 def render() -> None:
@@ -28,12 +28,12 @@ def render() -> None:
     if not plan_df.empty:
         monthly_rate = plan_df.set_index("plan_type").loc["Monthly", "churn_rate_pct"] if "Monthly" in plan_df["plan_type"].values else 0
         annual_rate = plan_df.set_index("plan_type").loc["Annual", "churn_rate_pct"] if "Annual" in plan_df["plan_type"].values else 0
-        col2.metric("Monthly plan churn", f"{monthly_rate:.1f}%")
-        col3.metric("Annual plan churn", f"{annual_rate:.1f}%")
+        col2.metric("Monthly plan churn", f"{monthly_rate:.2f}%")
+        col3.metric("Annual plan churn", f"{annual_rate:.2f}%")
 
     st.info(
-        f"**Headline insight.** Annual plans churn at **{annual_rate:.1f}%** versus **{monthly_rate:.1f}%** for monthly — "
-        "a ~{:.0f}x retention advantage. Shifting plan mix is one of the highest-leverage retention levers.".format(
+        f"**Headline insight.** Annual plans churn at **{annual_rate:.2f}%** versus **{monthly_rate:.2f}%** for monthly — "
+        "a ~{:.2f}x retention advantage. Shifting plan mix is one of the highest-leverage retention levers.".format(
             (monthly_rate / annual_rate) if annual_rate else 0
         )
     )
@@ -48,6 +48,7 @@ def render() -> None:
                      color_discrete_sequence=[COLOR_NEG],
                      title="Churn reasons (account count)")
         fig.update_layout(height=380, yaxis_title=None, xaxis_title="Churned accounts")
+        apply_plotly_theme(fig)
         st.plotly_chart(fig, use_container_width=True)
     with col2:
         rdf = reason_df.copy()
@@ -58,6 +59,7 @@ def render() -> None:
                       color_discrete_sequence=[PALETTE[1]],
                       title="Lost MRR by churn reason ($)")
         fig2.update_layout(height=380, yaxis_title=None, xaxis_title="Last MRR ($)")
+        apply_plotly_theme(fig2)
         st.plotly_chart(fig2, use_container_width=True)
 
     st.divider()
@@ -72,6 +74,7 @@ def render() -> None:
                       title="Churn events per month",
                       color_discrete_sequence=[COLOR_NEUTRAL])
         fig3.update_layout(height=320, yaxis_title="Churned accounts", xaxis_title=None)
+        apply_plotly_theme(fig3)
         st.plotly_chart(fig3, use_container_width=True)
 
     st.divider()

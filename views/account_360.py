@@ -8,7 +8,7 @@ import streamlit as st
 from lib import data as dl
 from lib import metrics
 from lib.export import build_account_deck
-from lib.theme import PALETTE, fmt_money, kpi_row, page_header
+from lib.theme import PALETTE, apply_plotly_theme, fmt_money, kpi_row, page_header
 
 
 def render() -> None:
@@ -64,10 +64,10 @@ def render() -> None:
 
     kpi_row([
         ("Segment", str(account_row["current_segment"]), None),
-        ("Tenure", f"{tenure_months} months", None),
+        ("Tenure", f"{tenure_months} mo", None),
         ("Latest MRR", fmt_money(latest_mrr), None),
         ("Peak MRR", fmt_money(peak_mrr), None),
-        ("Products adopted", f"{n_products}", None),
+        ("Products", f"{n_products}", None),
         ("Status", status, None),
     ])
 
@@ -98,6 +98,7 @@ def render() -> None:
             churn_reason = ctx["churn"].iloc[0]["churn_reason"]
             _vline(ctx["churn"].iloc[0]["churn_month"], f"Churned: {churn_reason}", "#DC2626")
         fig.update_layout(height=380, yaxis_title="MRR ($)", xaxis_title=None)
+        apply_plotly_theme(fig)
         st.plotly_chart(fig, use_container_width=True)
 
     # Product timeline

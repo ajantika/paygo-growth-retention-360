@@ -8,7 +8,7 @@ import streamlit as st
 
 from lib import data as dl
 from lib import metrics
-from lib.theme import COLOR_NEG, COLOR_POS, PALETTE, fmt_money, page_header
+from lib.theme import COLOR_NEG, COLOR_POS, PALETTE, apply_plotly_theme, fmt_money, page_header
 
 
 def render() -> None:
@@ -64,6 +64,7 @@ def render() -> None:
         yaxis_title="MRR ($)",
         showlegend=False,
     )
+    apply_plotly_theme(fig)
     st.plotly_chart(fig, use_container_width=True)
 
     bridge_err = float(row["bridge_check"])
@@ -82,12 +83,14 @@ def render() -> None:
                       title="Net new MRR per month",
                       color_discrete_sequence=[PALETTE[0]])
         fig2.update_layout(yaxis_title="Net new MRR ($)", xaxis_title=None, height=320)
+        apply_plotly_theme(fig2)
         st.plotly_chart(fig2, use_container_width=True)
     with col2:
         fig3 = px.line(trend, x="month", y="ending_mrr",
                        title="Ending MRR trend",
                        color_discrete_sequence=[PALETTE[1]])
         fig3.update_layout(yaxis_title="MRR ($)", xaxis_title=None, height=320)
+        apply_plotly_theme(fig3)
         st.plotly_chart(fig3, use_container_width=True)
 
     st.divider()
@@ -99,4 +102,5 @@ def render() -> None:
                    color_discrete_sequence=PALETTE,
                    title="Account movement mix over time")
     fig4.update_layout(height=360, xaxis_title=None, legend_title=None)
+    apply_plotly_theme(fig4)
     st.plotly_chart(fig4, use_container_width=True)
