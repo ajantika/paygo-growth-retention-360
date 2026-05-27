@@ -1,7 +1,6 @@
 """Overview — KPI cockpit + headline charts + exec deck export."""
 from __future__ import annotations
 
-import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
@@ -9,13 +8,15 @@ import streamlit as st
 from lib import data as dl
 from lib import metrics
 from lib.export import build_exec_summary_deck
-from lib.theme import PALETTE, apply_plotly_theme, fmt_money, fmt_pct, kpi_row, page_header
+from lib.theme import (
+    PALETTE, apply_plotly_theme, fmt_money, fmt_pct, kpi_row, page_header, PLOTLY_CONFIG,
+)
 
 
 def render() -> None:
     page_header(
         "PayGo Growth & Retention 360",
-        "Self-serve partner reporting — revenue lifecycle, retention, and graduation in one place.",
+        "Self-serve partner reporting — monthly proceeds, retention, and tier conversion in one place.",
     )
 
     accounts = dl.load_accounts()
@@ -25,30 +26,47 @@ def render() -> None:
     kpis = metrics.current_kpis(mrr, accounts, grads)
 
     kpi_row([
-        ("Current MRR", fmt_money(kpis["current_mrr"]), None),
+        ("Monthly Proceeds (MRR)", fmt_money(kpis["current_mrr"]), None),
+        ("ARPA", fmt_money(kpis["arpa"]), None),
         ("Active accounts", f"{kpis['active_accounts']:,}", None),
         ("NRR", fmt_pct(kpis["nrr"]), None),
         ("GRR", fmt_pct(kpis["grr"]), None),
-        ("Graduated to Enterprise", fmt_pct(kpis["graduation_rate"]), f"{kpis['graduations']} accts"),
-        ("Median time-to-upgrade", f"{int(kpis['median_time_to_upgrade_days'])} days", None),
+        ("Tier conversion rate", fmt_pct(kpis["graduation_rate"]), None),
     ])
+    st.caption(
+        f"{kpis['active_enterprise_accounts']} accounts on Enterprise · "
+        f"Median time-to-upgrade: {int(kpis['median_time_to_upgrade_days'])} days · "
+        f"NRR is tier-conversion-adjusted (organic expansion only)."
+    )
 
     st.divider()
 
-    # MRR over time, segmented
-    seg = (
-        mrr.groupby(["month", "segment"], as_index=False)["mrr"].sum().sort_values("month")
+    # ---- MRR over time, split into plan vs usage ----
+    seg = mrr.groupby("month", as_index=False).agg(
+        plan_mrr=("plan_mrr", "sum"),
+        usage_mrr=("usage_mrr", "sum"),
     )
-    fig = px.area(
-        seg, x="month", y="mrr", color="segment",
-        color_discrete_sequence=PALETTE,
-        title="MRR over time, by segment",
+    fig = go.Figure()
+    fig.add_traces([
+        go.Scatter(
+            x=seg["month"], y=seg["plan_mrr"], stackgroup="one", name="Plan (subscription)",
+            line=dict(color=PALETTE[0], width=0),
+            fillcolor="rgba(167,139,250,0.55)",
+        ),
+        go.Scatter(
+            x=seg["month"], y=seg["usage_mrr"], stackgroup="one", name="Usage (consumption)",
+            line=dict(color=PALETTE[1], width=0),
+            fillcolor="rgba(96,165,250,0.55)",
+        ),
+    ])
+    fig.update_layout(
+        title="Monthly Proceeds over time — plan vs usage",
+        yaxis_title="MRR ($)", xaxis_title=None, legend_title=None, height=380,
     )
-    fig.update_layout(yaxis_title="MRR ($)", xaxis_title=None, legend_title=None, height=380)
     apply_plotly_theme(fig)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
-    # Plan mix — show the headline insight: monthly churns much more than annual
+    # ---- Plan mix and retention ----
     st.markdown("#### Plan mix and retention")
     cs = metrics.churn_summary(dl.load_churn(), accounts)
     plan = cs["by_plan"].copy()
@@ -56,33 +74,22 @@ def render() -> None:
 
     col1, col2 = st.columns([3, 2])
     with col1:
-        # Stacked bar — total accounts split by retained vs churned, side by side for each plan
         fig2 = go.Figure()
         fig2.add_bar(
-            name="Retained",
-            x=plan["plan_type"],
-            y=plan["retained"],
-            marker_color="#34D399",   # emerald
-            text=plan["retained"],
-            textposition="inside",
+            name="Retained", x=plan["plan_type"], y=plan["retained"],
+            marker_color="#34D399", text=plan["retained"], textposition="inside",
         )
         fig2.add_bar(
-            name="Churned",
-            x=plan["plan_type"],
-            y=plan["churned"],
-            marker_color="#EF4444",   # red — semantically correct for churn
-            text=plan["churned"],
-            textposition="inside",
+            name="Churned", x=plan["plan_type"], y=plan["churned"],
+            marker_color="#EF4444", text=plan["churned"], textposition="inside",
         )
         fig2.update_layout(
             barmode="stack",
             title="Accounts by plan — retained vs churned",
-            yaxis_title="Accounts",
-            xaxis_title=None,
-            height=360,
+            yaxis_title="Accounts", xaxis_title=None, height=360,
         )
         apply_plotly_theme(fig2)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
     with col2:
         st.markdown("")
         st.markdown("")
@@ -104,7 +111,7 @@ def render() -> None:
 
     st.divider()
 
-    # Exec summary deck export
+    # ---- Exec summary deck export ----
     st.markdown("**Executive summary export**")
     trend = mrr.groupby("month", as_index=False)["mrr"].sum().sort_values("month")
     deck_bytes = build_exec_summary_deck(kpis, trend)

@@ -8,7 +8,7 @@ import streamlit as st
 from lib import data as dl
 from lib import metrics
 from lib.export import build_account_deck
-from lib.theme import PALETTE, apply_plotly_theme, fmt_money, kpi_row, page_header
+from lib.theme import PALETTE, PLOTLY_CONFIG, apply_plotly_theme, fmt_money, kpi_row, page_header
 
 
 def render() -> None:
@@ -23,15 +23,18 @@ def render() -> None:
     churn = dl.load_churn()
     grads = dl.load_graduations()
 
-    # Filter chips
-    col1, col2, col3 = st.columns(3)
+    # Filter chips (now includes PayGo subtier — Free/Pro/Business)
+    col1, col2, col3, col4 = st.columns(4)
     seg_filter = col1.selectbox("Segment", options=["(all)", "PayGo", "Enterprise"])
-    plan_filter = col2.selectbox("Plan type", options=["(all)", "Monthly", "Annual"])
-    status_filter = col3.selectbox("Status", options=["(all)", "Active", "Churned"])
+    subtier_filter = col2.selectbox("PayGo subtier", options=["(all)", "Free", "Pro", "Business"])
+    plan_filter = col3.selectbox("Plan type", options=["(all)", "Monthly", "Annual"])
+    status_filter = col4.selectbox("Status", options=["(all)", "Active", "Churned"])
 
     filtered = accounts.copy()
     if seg_filter != "(all)":
         filtered = filtered[filtered["current_segment"] == seg_filter]
+    if subtier_filter != "(all)":
+        filtered = filtered[filtered["paygo_subtier"] == subtier_filter]
     if plan_filter != "(all)":
         filtered = filtered[filtered["plan_type"] == plan_filter]
     if status_filter == "Active":
@@ -64,6 +67,7 @@ def render() -> None:
 
     kpi_row([
         ("Segment", str(account_row["current_segment"]), None),
+        ("Subtier", str(account_row.get("paygo_subtier", "—")), None),
         ("Tenure", f"{tenure_months} mo", None),
         ("Latest MRR", fmt_money(latest_mrr), None),
         ("Peak MRR", fmt_money(peak_mrr), None),
@@ -93,13 +97,13 @@ def render() -> None:
                                bgcolor="rgba(255,255,255,0.85)")
 
         if not ctx["graduation"].empty:
-            _vline(ctx["graduation"].iloc[0]["graduation_month"], "Graduated", PALETTE[1])
+            _vline(ctx["graduation"].iloc[0]["graduation_month"], "Tier conversion", PALETTE[1])
         if not ctx["churn"].empty:
             churn_reason = ctx["churn"].iloc[0]["churn_reason"]
             _vline(ctx["churn"].iloc[0]["churn_month"], f"Churned: {churn_reason}", "#DC2626")
         fig.update_layout(height=380, yaxis_title="MRR ($)", xaxis_title=None)
         apply_plotly_theme(fig)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
     # Product timeline
     if not ctx["products"].empty:

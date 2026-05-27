@@ -1,4 +1,4 @@
-"""Product Adoption — entry-product distribution, cross-sell Sankey, products-per-account."""
+"""Feature Adoption — entry products, top adoption journeys, account breadth."""
 from __future__ import annotations
 
 import pandas as pd
@@ -8,13 +8,13 @@ import streamlit as st
 
 from lib import data as dl
 from lib import metrics
-from lib.theme import PALETTE, apply_plotly_theme, page_header
+from lib.theme import PALETTE, PLOTLY_CONFIG, apply_plotly_theme, page_header
 
 
 def render() -> None:
     page_header(
-        "Product Adoption",
-        "Entry products, cross-sell journeys, and account breadth.",
+        "Feature Adoption",
+        "Entry products, top adoption journeys, and account breadth.",
     )
 
     accounts = dl.load_accounts()
@@ -30,7 +30,7 @@ def render() -> None:
                      title="Entry product distribution")
         fig.update_layout(height=380, yaxis_title=None, xaxis_title="Accounts")
         apply_plotly_theme(fig)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
     with col2:
         dist = metrics.products_per_account(subs)
         fig2 = px.bar(dist, x="n_products", y="accounts",
@@ -38,12 +38,14 @@ def render() -> None:
                       title="Products adopted per account")
         fig2.update_layout(height=380, xaxis_title="# products", yaxis_title="Accounts")
         apply_plotly_theme(fig2)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
 
     st.divider()
 
-    # Cross-sell Sankey — distinct node columns for source vs target so it flows left → right.
-    pairs = metrics.cross_sell_pairs(subs)
+    # ---- Top 10 feature-adoption journeys (trimmed Sankey, two-column layout) ----
+    pairs_all = metrics.cross_sell_pairs(subs)
+    pairs = pairs_all.head(10).copy()
+
     if not pairs.empty:
         source_labels = [f"{s} (entry)" for s in pairs["source"].unique()]
         target_labels = [f"{t} (added)" for t in pairs["target"].unique()]
@@ -52,9 +54,7 @@ def render() -> None:
         idx_src = {s: i for i, s in enumerate(pairs["source"].unique())}
         idx_tgt = {t: i + len(source_labels) for i, t in enumerate(pairs["target"].unique())}
 
-        # X positions: sources on left (0.01), targets on right (0.99)
         node_x = [0.01] * len(source_labels) + [0.99] * len(target_labels)
-        # Color sources lavender, targets sky-blue
         node_colors = [PALETTE[0]] * len(source_labels) + [PALETTE[1]] * len(target_labels)
 
         fig3 = go.Figure(go.Sankey(
@@ -62,7 +62,7 @@ def render() -> None:
             node={
                 "label": labels,
                 "color": node_colors,
-                "pad": 18,
+                "pad": 22,
                 "thickness": 18,
                 "x": node_x,
                 "y": [0.5] * len(labels),
@@ -76,14 +76,15 @@ def render() -> None:
             },
         ))
         fig3.update_layout(
-            title="Cross-sell: entry product → expansion product",
-            height=520,
+            title="Top 10 feature adoption journeys (entry product → next product)",
+            height=460,
             font=dict(color="#E2E8F0"),
         )
         apply_plotly_theme(fig3)
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
+        st.caption("Showing the top 10 most common journeys. See the table below for the full list.")
 
     st.divider()
-    st.markdown("**Top cross-sell journeys**")
-    if not pairs.empty:
-        st.dataframe(pairs.head(15), use_container_width=True, hide_index=True)
+    st.markdown("**Full table — feature adoption journeys**")
+    if not pairs_all.empty:
+        st.dataframe(pairs_all.head(20), use_container_width=True, hide_index=True)

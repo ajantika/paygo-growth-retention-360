@@ -7,7 +7,10 @@ import streamlit as st
 
 from lib import data as dl
 from lib import metrics
-from lib.theme import COLOR_NEG, COLOR_NEUTRAL, COLOR_POS, PALETTE, apply_plotly_theme, fmt_money, fmt_pct, page_header
+from lib.theme import (
+    COLOR_NEG, COLOR_NEUTRAL, COLOR_POS, PALETTE, PLOTLY_CONFIG,
+    apply_plotly_theme, fmt_money, fmt_pct, page_header,
+)
 
 
 def render() -> None:
@@ -49,18 +52,18 @@ def render() -> None:
                      title="Churn reasons (account count)")
         fig.update_layout(height=380, yaxis_title=None, xaxis_title="Churned accounts")
         apply_plotly_theme(fig)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
     with col2:
         rdf = reason_df.copy()
         rdf["churned_mrr"] = rdf["churned_mrr"].round(0)
         fig2 = px.bar(rdf.sort_values("churned_mrr"),
                       x="churned_mrr", y="churn_reason",
                       orientation="h",
-                      color_discrete_sequence=[PALETTE[1]],
+                      color_discrete_sequence=[COLOR_NEG],   # unified red — same as count chart
                       title="Lost MRR by churn reason ($)")
         fig2.update_layout(height=380, yaxis_title=None, xaxis_title="Last MRR ($)")
         apply_plotly_theme(fig2)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
 
     st.divider()
 
@@ -72,10 +75,10 @@ def render() -> None:
         ).reset_index()
         fig3 = px.bar(ts, x="churn_month", y="accounts",
                       title="Churn events per month",
-                      color_discrete_sequence=[COLOR_NEUTRAL])
+                      color_discrete_sequence=[COLOR_NEG])
         fig3.update_layout(height=320, yaxis_title="Churned accounts", xaxis_title=None)
         apply_plotly_theme(fig3)
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
 
     st.divider()
     st.markdown("**Churn by segment at time of churn**")

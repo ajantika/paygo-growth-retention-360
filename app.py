@@ -12,6 +12,7 @@ from lib.theme import demo_banner
 from views import (
     account_360,
     churn_diagnostics,
+    cohort_retention,
     overview,
     paygo_enterprise,
     product_adoption,
@@ -30,9 +31,10 @@ def main() -> None:
     pages = [
         st.Page(overview.render, title="Overview", icon="🏠", url_path="overview", default=True),
         st.Page(revenue_lifecycle.render, title="Revenue Lifecycle", icon="💸", url_path="revenue-lifecycle"),
-        st.Page(paygo_enterprise.render, title="PayGo → Enterprise", icon="🚀", url_path="paygo-enterprise"),
+        st.Page(cohort_retention.render, title="Cohort Retention", icon="📊", url_path="cohort-retention"),
+        st.Page(paygo_enterprise.render, title="Tier Conversion", icon="🚀", url_path="tier-conversion"),
         st.Page(churn_diagnostics.render, title="Churn Diagnostics", icon="📉", url_path="churn-diagnostics"),
-        st.Page(product_adoption.render, title="Product Adoption", icon="🧩", url_path="product-adoption"),
+        st.Page(product_adoption.render, title="Feature Adoption", icon="🧩", url_path="feature-adoption"),
         st.Page(account_360.render, title="Account 360", icon="🔍", url_path="account-360"),
     ]
     nav = st.navigation(pages)

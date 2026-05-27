@@ -31,6 +31,21 @@ PLOTLY_LAYOUT = dict(
     legend=dict(bgcolor="rgba(0,0,0,0)"),
 )
 
+# Pass this to every st.plotly_chart(..., config=PLOTLY_CONFIG) to hide the modebar.
+PLOTLY_CONFIG = {"displayModeBar": False}
+
+# Canonical color mapping for movement categories so every view agrees.
+MOVEMENT_COLORS = {
+    "new": "#34D399",             # emerald
+    "expansion": "#A78BFA",       # lavender (primary)
+    "reactivated": "#22D3EE",     # cyan
+    "tier_conversion": "#FBBF24", # amber (distinctive — it's a structural event)
+    "flat": "#94A3B8",            # slate
+    "contraction": "#FB923C",     # orange
+    "churn": "#EF4444",           # red
+    "inactive": "#475569",        # dim slate
+}
+
 
 def apply_plotly_theme(fig):
     fig.update_layout(**PLOTLY_LAYOUT)

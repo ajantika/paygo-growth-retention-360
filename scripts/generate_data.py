@@ -1,13 +1,20 @@
-"""Generate synthetic PayGo customer lifecycle data.
+"""Generate synthetic PayGo customer lifecycle data — v2.
 
-Produces 5 parquet files in /data:
-- accounts.parquet         one row per account
-- mrr_monthly.parquet      one row per (account, month) with MRR
-- subscriptions.parquet    one row per (account, product, start, end)
-- churn_events.parquet     one row per churn event with reason
-- graduations.parquet      PayGo -> Enterprise upgrades with time-to-upgrade
+Schema upgrades vs v1:
+- accounts.paygo_subtier              Free / Pro / Business (filter, not headline split)
+- mrr_monthly.plan_mrr, usage_mrr     subscription vs consumption split
+                                      (App Store analogue: subscription proceeds vs in-app proceeds)
+- Enterprise contracts now sampled from lognormal $3K-$50K
+- mrr = plan_mrr + usage_mrr  (always)
 
-Everything is synthetic. Seed pinned for reproducibility.
+Files produced in /data:
+  accounts.parquet         one row per account
+  mrr_monthly.parquet      one row per (account, month)
+  subscriptions.parquet    one row per (account, product) — start/end months
+  churn_events.parquet     one row per churn
+  graduations.parquet      PayGo -> Enterprise upgrades with time-to-upgrade
+
+100% synthetic. Seed pinned for reproducibility.
 """
 from __future__ import annotations
 
@@ -17,10 +24,11 @@ import numpy as np
 import pandas as pd
 
 SEED = 42
-N_ACCOUNTS = 600
+N_ACCOUNTS = 800
 START_MONTH = pd.Timestamp("2024-01-01")
 END_MONTH = pd.Timestamp("2026-04-01")
 
+# Real Cloudflare-shaped product list (plus a couple developer-platform names)
 PRODUCTS = ["Workers", "R2 Storage", "Zero Trust", "Pages", "Stream", "Images", "D1", "Queues"]
 REGIONS = ["NAMER", "EMEA", "APAC", "LATAM"]
 CHANNELS = ["Self-serve", "Inbound sales", "Partner referral", "Marketing"]
@@ -33,25 +41,36 @@ CHURN_REASONS = [
     "Missing feature",
 ]
 
-PRODUCT_BASE_MRR = {
-    "Workers": 25,
-    "R2 Storage": 45,
-    "Zero Trust": 38,
-    "Pages": 18,
-    "Stream": 60,
-    "Images": 28,
-    "D1": 22,
-    "Queues": 24,
+# PayGo subtiers (analogous to Cloudflare's Free / Pro / Business)
+SUBTIERS = ["Free", "Pro", "Business"]
+SUBTIER_WEIGHTS = [0.40, 0.45, 0.15]
+PLAN_MRR_BY_SUBTIER = {"Free": 0.0, "Pro": 20.0, "Business": 200.0}
+# Usage MRR shape (lognormal params + cap) per subtier
+USAGE_SHAPE = {
+    "Free":     {"mu": 1.5, "sigma": 1.1, "cap": 80.0,   "growth": 0.015},
+    "Pro":      {"mu": 3.0, "sigma": 1.0, "cap": 400.0,  "growth": 0.025},
+    "Business": {"mu": 4.5, "sigma": 1.0, "cap": 1800.0, "growth": 0.030},
 }
 
 # Per-month churn hazard
-HAZARD_MONTHLY = 0.030
-HAZARD_ANNUAL = 0.006
-HAZARD_ENT_MULT = 0.10  # Enterprise much stickier
+HAZARD_MONTHLY = 0.025
+HAZARD_ANNUAL = 0.005
+HAZARD_ENT_MULT = 0.08  # Enterprise much stickier
 
 
 def month_range(start: pd.Timestamp, end: pd.Timestamp) -> pd.DatetimeIndex:
     return pd.date_range(start=start, end=end, freq="MS")
+
+
+def sample_initial_usage(subtier: str, rng: np.random.Generator) -> float:
+    shape = USAGE_SHAPE[subtier]
+    return float(min(shape["cap"], rng.lognormal(shape["mu"] * 0.6, shape["sigma"] * 0.8)))
+
+
+def sample_enterprise_contract(rng: np.random.Generator) -> float:
+    """Enterprise plan MRR: lognormal centered ~$8K, clipped to [$3K, $40K]."""
+    raw = rng.lognormal(mean=np.log(8_000), sigma=0.55)
+    return float(np.clip(raw, 3_000.0, 40_000.0))
 
 
 def main() -> None:
@@ -62,7 +81,6 @@ def main() -> None:
     months = month_range(START_MONTH, END_MONTH)
 
     # ---- Accounts ----
-    # Skew signups toward more recent months
     weights = np.linspace(0.6, 1.6, len(months))
     weights = weights / weights.sum()
     signup_idx = rng.choice(len(months), size=N_ACCOUNTS, p=weights)
@@ -75,6 +93,7 @@ def main() -> None:
             "region": rng.choice(REGIONS, size=N_ACCOUNTS, p=[0.45, 0.30, 0.18, 0.07]),
             "channel": rng.choice(CHANNELS, size=N_ACCOUNTS, p=[0.55, 0.20, 0.15, 0.10]),
             "plan_type": rng.choice(["Monthly", "Annual"], size=N_ACCOUNTS, p=[0.72, 0.28]),
+            "paygo_subtier": rng.choice(SUBTIERS, size=N_ACCOUNTS, p=SUBTIER_WEIGHTS),
             "entry_product": rng.choice(
                 PRODUCTS, size=N_ACCOUNTS, p=[0.32, 0.18, 0.14, 0.12, 0.08, 0.06, 0.06, 0.04]
             ),
@@ -89,20 +108,21 @@ def main() -> None:
 
     for _, acc in accounts.iterrows():
         signup = acc["signup_month"]
-        plan = acc["plan_type"]
+        plan_type = acc["plan_type"]
         entry = acc["entry_product"]
-        scale = float(np.clip(rng.lognormal(mean=0.2, sigma=0.7), 0.4, 6.0))
-        cur_mrr = max(8.0, PRODUCT_BASE_MRR[entry] * scale)
+        subtier = acc["paygo_subtier"]
+        shape = USAGE_SHAPE[subtier]
+
+        plan_mrr = PLAN_MRR_BY_SUBTIER[subtier]
+        usage_mrr = sample_initial_usage(subtier, rng)
 
         products = {entry}
-        sub_rows.append(
-            {
-                "account_id": acc["account_id"],
-                "product": entry,
-                "start_month": signup,
-                "end_month": pd.NaT,
-            }
-        )
+        sub_rows.append({
+            "account_id": acc["account_id"],
+            "product": entry,
+            "start_month": signup,
+            "end_month": pd.NaT,
+        })
 
         segment = "PayGo"
         churned = False
@@ -113,99 +133,104 @@ def main() -> None:
 
             tenure_m = (m.year - signup.year) * 12 + (m.month - signup.month)
 
-            # Monthly MRR drift: small positive expected value, some noise
-            if segment == "PayGo":
-                drift = float(rng.normal(loc=0.022, scale=0.07))
-            else:
-                drift = float(rng.normal(loc=0.008, scale=0.04))
-            cur_mrr = max(0.0, cur_mrr * (1 + drift))
+            # Usage MRR drift: subtier-specific growth + noise, capped
+            growth = shape["growth"] if segment == "PayGo" else 0.008
+            drift = float(rng.normal(loc=growth, scale=0.08))
+            usage_mrr = max(0.0, usage_mrr * (1 + drift))
+            usage_mrr = min(usage_mrr, shape["cap"] if segment == "PayGo" else plan_mrr * 0.35)
 
             # Cross-sell: chance to adopt new product (PayGo more dynamic)
-            cross_sell_p = 0.07 if segment == "PayGo" else 0.03
+            cross_sell_p = 0.06 if segment == "PayGo" else 0.025
             if rng.random() < cross_sell_p and len(products) < 5:
                 remaining = [p for p in PRODUCTS if p not in products]
                 if remaining:
                     new_p = rng.choice(remaining)
                     products.add(new_p)
-                    add_mrr = float(rng.uniform(15, 55))
-                    cur_mrr += add_mrr
-                    sub_rows.append(
-                        {
-                            "account_id": acc["account_id"],
-                            "product": new_p,
-                            "start_month": m,
-                            "end_month": pd.NaT,
-                        }
-                    )
+                    # New product adds a usage bump (not a plan change)
+                    usage_bump = float(rng.uniform(8, 40)) if subtier == "Free" else float(rng.uniform(20, 150))
+                    usage_mrr = min(shape["cap"], usage_mrr + usage_bump)
+                    sub_rows.append({
+                        "account_id": acc["account_id"],
+                        "product": new_p,
+                        "start_month": m,
+                        "end_month": pd.NaT,
+                    })
 
-            # PayGo -> Enterprise graduation: tenure + MRR gated
-            if segment == "PayGo" and tenure_m >= 3 and cur_mrr > 120:
-                grad_prob = min(0.22, 0.05 + (cur_mrr - 120) / 2400.0)
-                if plan == "Annual":
-                    grad_prob *= 1.4
+            cur_mrr = plan_mrr + usage_mrr
+
+            # PayGo -> Enterprise (tier conversion): tenure + MRR gated
+            # Only Business-tier or high-usage Pro accounts typically graduate
+            tier_gate = (subtier == "Business") or (subtier == "Pro" and cur_mrr > 200)
+            if segment == "PayGo" and tenure_m >= 4 and tier_gate:
+                base_p = 0.015 if subtier == "Pro" else 0.04
+                grad_prob = min(0.10, base_p + (cur_mrr - 100) / 8000.0)
+                if plan_type == "Annual":
+                    grad_prob *= 1.3
                 if rng.random() < grad_prob:
                     pre_grad_mrr = cur_mrr
-                    jump = float(rng.uniform(2.5, 5))
-                    cur_mrr = cur_mrr * jump
+                    new_plan = sample_enterprise_contract(rng)
+                    plan_mrr = new_plan
+                    usage_mrr = new_plan * float(rng.uniform(0.05, 0.25))
                     segment = "Enterprise"
-                    grad_rows.append(
-                        {
-                            "account_id": acc["account_id"],
-                            "first_paygo_month": signup,
-                            "graduation_month": m,
-                            "time_to_upgrade_days": int((m - signup).days),
-                            "paygo_mrr_at_graduation": float(pre_grad_mrr),
-                            "enterprise_mrr_after": float(cur_mrr),
-                        }
-                    )
+                    grad_rows.append({
+                        "account_id": acc["account_id"],
+                        "first_paygo_month": signup,
+                        "graduation_month": m,
+                        "time_to_upgrade_days": int((m - signup).days),
+                        "paygo_mrr_at_graduation": float(pre_grad_mrr),
+                        "enterprise_mrr_after": float(plan_mrr + usage_mrr),
+                    })
+                    cur_mrr = plan_mrr + usage_mrr
 
             # Churn hazard
-            hazard = HAZARD_ANNUAL if plan == "Annual" else HAZARD_MONTHLY
+            hazard = HAZARD_ANNUAL if plan_type == "Annual" else HAZARD_MONTHLY
             if segment == "Enterprise":
                 hazard *= HAZARD_ENT_MULT
+            if subtier == "Free":
+                hazard *= 1.2  # Free tier churns slightly more
             if tenure_m > 6:
                 hazard *= 0.85
             if rng.random() < hazard:
-                churn_rows.append(
-                    {
-                        "account_id": acc["account_id"],
-                        "churn_month": m,
-                        "churn_reason": rng.choice(
-                            CHURN_REASONS, p=[0.22, 0.18, 0.24, 0.14, 0.12, 0.10]
-                        ),
-                        "last_mrr": float(cur_mrr),
-                        "segment_at_churn": segment,
-                        "plan_type": plan,
-                    }
-                )
-                mrr_rows.append(
-                    {
-                        "account_id": acc["account_id"],
-                        "month": m,
-                        "mrr": float(cur_mrr),
-                        "segment": segment,
-                        "n_products": len(products),
-                        "plan_type": plan,
-                        "region": acc["region"],
-                    }
-                )
+                churn_rows.append({
+                    "account_id": acc["account_id"],
+                    "churn_month": m,
+                    "churn_reason": rng.choice(
+                        CHURN_REASONS, p=[0.22, 0.18, 0.24, 0.14, 0.12, 0.10]
+                    ),
+                    "last_mrr": float(cur_mrr),
+                    "segment_at_churn": segment,
+                    "plan_type": plan_type,
+                })
+                mrr_rows.append({
+                    "account_id": acc["account_id"],
+                    "month": m,
+                    "mrr": float(cur_mrr),
+                    "plan_mrr": float(plan_mrr),
+                    "usage_mrr": float(usage_mrr),
+                    "segment": segment,
+                    "paygo_subtier": subtier,
+                    "n_products": len(products),
+                    "plan_type": plan_type,
+                    "region": acc["region"],
+                })
                 for sr in sub_rows:
                     if sr["account_id"] == acc["account_id"] and pd.isna(sr["end_month"]):
                         sr["end_month"] = m
                 churned = True
                 break
 
-            mrr_rows.append(
-                {
-                    "account_id": acc["account_id"],
-                    "month": m,
-                    "mrr": float(cur_mrr),
-                    "segment": segment,
-                    "n_products": len(products),
-                    "plan_type": plan,
-                    "region": acc["region"],
-                }
-            )
+            mrr_rows.append({
+                "account_id": acc["account_id"],
+                "month": m,
+                "mrr": float(cur_mrr),
+                "plan_mrr": float(plan_mrr),
+                "usage_mrr": float(usage_mrr),
+                "segment": segment,
+                "paygo_subtier": subtier,
+                "n_products": len(products),
+                "plan_type": plan_type,
+                "region": acc["region"],
+            })
 
     mrr = pd.DataFrame(mrr_rows)
     churn = pd.DataFrame(churn_rows)
@@ -243,13 +268,21 @@ def main() -> None:
     subs.to_parquet(data_dir / "subscriptions.parquet", index=False)
     grads.to_parquet(data_dir / "graduations.parquet", index=False)
 
+    latest = mrr["month"].max()
+    last = mrr[mrr["month"] == latest]
+    total_mrr = last["mrr"].sum()
+    active_now = (last["mrr"] > 0).sum()
+    avg_ent_mrr = last[last["segment"] == "Enterprise"]["mrr"].mean() if (last["segment"] == "Enterprise").any() else 0.0
+
     print("Generated:")
-    print(f"  accounts:       {len(accounts):>6}")
-    print(f"  mrr rows:       {len(mrr):>6}")
-    print(f"  churn events:   {len(churn):>6}")
-    print(f"  subscriptions:  {len(subs):>6}")
-    print(f"  graduations:    {len(grads):>6}")
-    print(f"  active now:     {int(accounts['is_active'].sum()):>6}")
+    print(f"  accounts:         {len(accounts):>6}")
+    print(f"  mrr rows:         {len(mrr):>6}")
+    print(f"  churn events:     {len(churn):>6}")
+    print(f"  subscriptions:    {len(subs):>6}")
+    print(f"  graduations:      {len(grads):>6}")
+    print(f"  active now:       {int(active_now):>6}")
+    print(f"  total MRR (latest): ${total_mrr:>10,.0f}")
+    print(f"  avg Enterprise MRR: ${avg_ent_mrr:>10,.0f}")
     print(f"\nWritten to {data_dir}/")
 
 

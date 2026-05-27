@@ -6,13 +6,13 @@ import plotly.express as px
 import streamlit as st
 
 from lib import data as dl
-from lib.theme import PALETTE, apply_plotly_theme, fmt_money, kpi_row, page_header
+from lib.theme import PALETTE, PLOTLY_CONFIG, apply_plotly_theme, fmt_money, kpi_row, page_header
 
 
 def render() -> None:
     page_header(
-        "PayGo → Enterprise",
-        "Which accounts graduate, how long it takes, and how big the jump is.",
+        "PayGo → Enterprise (Tier conversion)",
+        "Which accounts convert tier, how long it takes, and how big the contract jump is.",
     )
 
     accounts = dl.load_accounts()
@@ -36,9 +36,9 @@ def render() -> None:
 
     kpi_row([
         ("Total PayGo signups", f"{total:,}", None),
-        ("Graduated to Enterprise", f"{graduated:,}", f"{grad_rate:.0f}%"),
-        ("Churned before graduating", f"{churned_before_grad:,}", None),
-        ("Median time-to-upgrade", f"{int(median_ttu)} days", None),
+        ("Converted to Enterprise", f"{graduated:,}", f"{grad_rate:.0f}%"),
+        ("Churned before converting", f"{churned_before_grad:,}", None),
+        ("Median time-to-convert", f"{int(median_ttu)} days", None),
         ("Median MRR jump", f"{avg_jump:.1f}x", None),
     ])
 
@@ -51,19 +51,19 @@ def render() -> None:
     })
     fig = px.funnel(funnel_df, x="accounts", y="stage",
                     color_discrete_sequence=[PALETTE[0]])
-    fig.update_layout(title="Graduation funnel", height=320)
+    fig.update_layout(title="Tier conversion funnel", height=320)
     apply_plotly_theme(fig)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
     if not grads.empty:
         col1, col2 = st.columns(2)
         with col1:
             fig2 = px.histogram(grads, x="time_to_upgrade_days", nbins=20,
-                                title="Time-to-upgrade distribution (days)",
+                                title="Time-to-convert distribution (days)",
                                 color_discrete_sequence=[PALETTE[1]])
-            fig2.update_layout(height=320, yaxis_title="Graduated accounts")
+            fig2.update_layout(height=320, yaxis_title="Converted accounts")
             apply_plotly_theme(fig2)
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
         with col2:
             grads_disp = grads.assign(
                 jump=grads["enterprise_mrr_after"] / grads["paygo_mrr_at_graduation"]
@@ -72,15 +72,15 @@ def render() -> None:
                 grads_disp, x="time_to_upgrade_days", y="enterprise_mrr_after",
                 size="jump", color="jump",
                 color_continuous_scale="Purples",
-                title="Time-to-upgrade vs. Enterprise MRR (size = MRR jump)",
+                title="Time-to-convert vs. Enterprise MRR (size = MRR jump)",
             )
             fig3.update_layout(height=320, yaxis_title="Enterprise MRR ($)",
-                               xaxis_title="Days to upgrade")
+                               xaxis_title="Days to convert")
             apply_plotly_theme(fig3)
-            st.plotly_chart(fig3, use_container_width=True)
+            st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
 
         st.divider()
-        st.markdown("**Recent graduations**")
+        st.markdown("**Recent tier conversions**")
         recent = grads.sort_values("graduation_month", ascending=False).head(15).copy()
         recent["paygo_mrr_at_graduation"] = recent["paygo_mrr_at_graduation"].apply(fmt_money)
         recent["enterprise_mrr_after"] = recent["enterprise_mrr_after"].apply(fmt_money)
