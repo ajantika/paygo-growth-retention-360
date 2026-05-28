@@ -24,30 +24,32 @@ MAX_MONTHS = 12
 # ---------- Cell-color helper ----------
 
 def _cell_color(v: float | None) -> str:
-    """Map a retention % to a SOLID HSL color with a wide lightness ramp.
+    """Map a retention % to a SOLID HSL color.
 
-    Alpha-blending lavender over a dark background compressed everything into
-    'some shade of medium purple'. Solid HSL colors vary lightness directly,
-    giving 50%+ perceptual contrast between the dimmest and brightest cells.
+    Design goal: high-retention cells should look RICH and SATURATED, not
+    'pale washed-out lavender'. We hold lightness at a medium level (so
+    cells don't go too light/pale at the top of the range) and let saturation
+    do most of the work — going from dim muted violet at low values to a
+    deep rich purple at 100%.
 
     Range:
-      50% retention → very dim violet (almost blends with bg) — "weak cohort"
-      75% retention → medium violet                            — "average"
-     100% retention → vivid bright lavender                    — "strong cohort"
+      50% retention → dim muted deep violet  — "weak cohort"
+      75% retention → medium rich violet     — "average"
+     100% retention → deep saturated purple  — "strong cohort"
     """
     if v is None or (isinstance(v, float) and np.isnan(v)):
         return "background-color: rgba(30, 41, 59, 0.25); color: #475569;"
 
     vc = max(50.0, min(100.0, float(v)))
     t = (vc - 50.0) / 50.0  # 0..1
-    t = t ** 0.6  # mild gamma so 70-90% values spread out visually
+    t = t ** 0.6  # mild gamma — spreads 70-90% values visually
 
-    # Solid HSL: lightness 28% → 78% (50-point spread = huge perceptual jump)
-    L = 28 + t * 50
-    S = 60 + t * 25  # also more saturated as retention rises
-    H = 262          # violet hue, same family as PALETTE[0]
+    # Lightness stays in the 28-55% band so high cells look RICH (not pale)
+    L = 28 + t * 27        # 28% → 55%
+    # Saturation does the heavy lifting: muted at low, vivid at high
+    S = 45 + t * 50        # 45% → 95%
+    H = 262                # violet hue
 
-    # Text: white reads everywhere in this lightness range
     return f"background-color: hsl({H}, {S:.0f}%, {L:.0f}%); color: #FFFFFF;"
 
 
