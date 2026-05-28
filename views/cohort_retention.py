@@ -24,31 +24,28 @@ MAX_MONTHS = 12
 # ---------- Cell-color helper ----------
 
 def _cell_color(v: float | None) -> str:
-    """Map a retention % to a SOLID HSL color.
+    """Map a retention % to a SOLID blue HSL color — Apple Cohort-Analysis style.
 
-    Design goal: high-retention cells should look RICH and SATURATED, not
-    'pale washed-out lavender'. We hold lightness at a medium level (so
-    cells don't go too light/pale at the top of the range) and let saturation
-    do most of the work — going from dim muted violet at low values to a
-    deep rich purple at 100%.
+    Blue gives more usable perceptual range than purple on a dark navy bg.
 
-    Range:
-      50% retention → dim muted deep violet  — "weak cohort"
-      75% retention → medium rich violet     — "average"
-     100% retention → deep saturated purple  — "strong cohort"
+    Range (after a 0.55 gamma):
+      50% retention → very dim slate (almost blends with bg) — "weak cohort"
+      75% retention → medium blue                            — "average"
+     100% retention → vivid Apple-style sky blue              — "strong cohort"
+
+    Lightness spans ~38 points (22→60) and saturation ~68 points (25→93),
+    so each ~10% retention band reads as a distinct shade.
     """
     if v is None or (isinstance(v, float) and np.isnan(v)):
-        return "background-color: rgba(30, 41, 59, 0.25); color: #475569;"
+        return "background-color: rgba(30, 41, 59, 0.20); color: #475569;"
 
     vc = max(50.0, min(100.0, float(v)))
     t = (vc - 50.0) / 50.0  # 0..1
-    t = t ** 0.6  # mild gamma — spreads 70-90% values visually
+    t = t ** 0.55           # stronger gamma — lifts low-to-mid contrast
 
-    # Lightness stays in the 28-55% band so high cells look RICH (not pale)
-    L = 28 + t * 27        # 28% → 55%
-    # Saturation does the heavy lifting: muted at low, vivid at high
-    S = 45 + t * 50        # 45% → 95%
-    H = 262                # violet hue
+    H = 213                 # matches PALETTE[1] sky blue (#60A5FA)
+    S = 25 + t * 68         # 25% → 93%
+    L = 22 + t * 38         # 22% → 60%
 
     return f"background-color: hsl({H}, {S:.0f}%, {L:.0f}%); color: #FFFFFF;"
 
