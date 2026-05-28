@@ -24,30 +24,36 @@ MAX_MONTHS = 12
 # ---------- Cell-color helper ----------
 
 def _cell_color(v: float | None) -> str:
-    """Map a retention % to a SOLID blue HSL color — Apple Cohort-Analysis style.
+    """Map a retention % to a pale-to-medium blue, like Apple's App Store
+    Connect Cohort Analysis / Daily Retention tables.
 
-    Blue gives more usable perceptual range than purple on a dark navy bg.
+    Apple's convention (matched here exactly):
+      low retention  -> very pale, nearly white-blue
+      high retention -> medium saturated Apple-blue (NOT very dark)
+      dark slate text on every cell
 
-    Range (after a 0.55 gamma):
-      50% retention → very dim slate (almost blends with bg) — "weak cohort"
-      75% retention → medium blue                            — "average"
-     100% retention → vivid Apple-style sky blue              — "strong cohort"
+    Range (after a 0.5 gamma so 60-80% values spread out visually):
+      50%  -> hsl(213, 100%, 92%)  nearly white with a blue tint
+      75%  -> hsl(213,  82%, 73%)  light blue
+     100%  -> hsl(213,  72%, 62%)  medium Apple-blue
 
-    Lightness spans ~38 points (22→60) and saturation ~68 points (25→93),
-    so each ~10% retention band reads as a distinct shade.
+    Lightness DECREASES as retention RISES (Apple's convention),
+    inverting the usual dark-theme "high = bright" rule.
     """
     if v is None or (isinstance(v, float) and np.isnan(v)):
-        return "background-color: rgba(30, 41, 59, 0.20); color: #475569;"
+        # Future / not-yet-reached cell: very faint slate, no emphasis
+        return "background-color: rgba(255, 255, 255, 0.03); color: #475569;"
 
     vc = max(50.0, min(100.0, float(v)))
     t = (vc - 50.0) / 50.0  # 0..1
-    t = t ** 0.55           # stronger gamma — lifts low-to-mid contrast
+    t = t ** 0.5            # gamma — gives 60-80% values more visual room
 
-    H = 213                 # matches PALETTE[1] sky blue (#60A5FA)
-    S = 25 + t * 68         # 25% → 93%
-    L = 22 + t * 38         # 22% → 60%
+    H = 213                 # Apple-blue hue
+    S = 100 - t * 28        # 100% -> 72%   (slight desaturation at high)
+    L = 92 - t * 30         # 92%  -> 62%   (lightness DOWN as retention UP)
 
-    return f"background-color: hsl({H}, {S:.0f}%, {L:.0f}%); color: #FFFFFF;"
+    # Dark slate text — Apple's convention. Readable down to L ~= 60.
+    return f"background-color: hsl({H}, {S:.0f}%, {L:.0f}%); color: #0F172A;"
 
 
 def _build_styled_table(display: pd.DataFrame, sizes: pd.Series) -> str:
