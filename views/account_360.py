@@ -117,13 +117,20 @@ def render() -> None:
         apply_plotly_theme(fig)
         st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
-    # Product timeline
+    # Product timeline — show product, when they adopted it, and a clean status
     if not ctx["products"].empty:
         st.markdown("**Product adoption timeline**")
         timeline = ctx["products"].copy()
-        timeline["start_month"] = pd.to_datetime(timeline["start_month"]).dt.strftime("%b %Y")
-        timeline["end_month"] = pd.to_datetime(timeline["end_month"]).dt.strftime("%b %Y").fillna("ongoing")
-        st.dataframe(timeline[["product", "start_month", "end_month"]], use_container_width=True, hide_index=True)
+        timeline["Adopted"] = pd.to_datetime(timeline["start_month"]).dt.strftime("%b %Y")
+        end_dates = pd.to_datetime(timeline["end_month"])
+        timeline["Status"] = end_dates.apply(
+            lambda d: "🟢 Active" if pd.isna(d) else f"🔴 Ended {d.strftime('%b %Y')}"
+        )
+        timeline = timeline.rename(columns={"product": "Product"})
+        st.dataframe(
+            timeline[["Product", "Adopted", "Status"]],
+            use_container_width=True, hide_index=True,
+        )
 
     # PPTX export
     st.divider()

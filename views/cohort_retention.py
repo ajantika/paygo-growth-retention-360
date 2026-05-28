@@ -1,23 +1,30 @@
 """Cohort retention — the App-Store-Connect-shaped view.
 
 Signup-month cohorts × months-since-signup, colored by % of cohort still active.
+Inspired by App Store Connect's Cohort Analysis layout: Total row at top,
+Paid Starts column showing cohort size, then M1..M12 columns.
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from lib import data as dl
 from lib import metrics
 from lib.theme import PLOTLY_CONFIG, apply_plotly_theme, fmt_pct, kpi_row, page_header
 
+# Heatmap column window — App Store Connect shows M1..M12
+MAX_MONTHS = 12
+
 
 def render() -> None:
     page_header(
         "Cohort Retention",
         "How long do accounts stick around after they sign up? "
-        "All percentages on this page mean: **of the accounts that signed up in month X, what % are still paying us N months later?**",
+        "All percentages mean: **of the accounts that signed up in month X, what % are still paying us N months later?**",
     )
 
     accounts = dl.load_accounts()
@@ -47,47 +54,101 @@ def render() -> None:
          "Of all signup cohorts that have lived ≥6 months, the average % of accounts still active 6 months after signup. "
          "Typically the most diagnostic — onboarding effects are gone."),
         ("Month 12 retention", fmt_pct(m12), None,
-         "Of all signup cohorts that have lived ≥12 months, the average % of accounts still active 12 months after signup. "
-         "Long-term anchor; equivalent to GRR cohort math."),
+         "Of all signup cohorts that have lived ≥12 months, the average % of accounts still active 12 months after signup."),
     ])
     st.caption(
         "Each KPI is the **average across cohorts** that have reached that age. "
-        "Heatmap below shows cohort-by-cohort detail — pick a row to follow one cohort across its life."
+        "Heatmap below shows cohort-by-cohort detail with each cohort's paid-start count."
     )
 
     st.divider()
 
-    # ---- Heatmap ----
-    # Limit to first ~24 months since signup for legibility
-    cap = cr[cr["months_since_signup"] <= 24].copy()
-    pivot = cap.pivot(
-        index="cohort_month", columns="months_since_signup", values="retained_pct"
-    ).sort_index()
+    # ---- Heatmap (App Store Connect style: Total row + Paid Starts column) ----
 
-    # Format cohort labels as 'Jan 2024' etc
-    pivot.index = pd.to_datetime(pivot.index).strftime("%b %Y")
-
-    fig = px.imshow(
-        pivot.values,
-        x=pivot.columns,
-        y=pivot.index,
-        labels=dict(x="Months since signup", y="Signup cohort", color="% still active"),
-        color_continuous_scale="Purples",
-        zmin=0, zmax=100,
-        aspect="auto",
-        text_auto=".0f",
+    # Pivot to cohort × months_since_signup
+    cap = cr[cr["months_since_signup"].between(1, MAX_MONTHS)].copy()
+    pivot = (
+        cap.pivot(index="cohort_month", columns="months_since_signup", values="retained_pct")
+        .sort_index()
     )
+    pivot = pivot.reindex(columns=range(1, MAX_MONTHS + 1))
+
+    # Cohort sizes (Paid Starts)
+    cohort_sizes = (
+        cr.groupby("cohort_month")["cohort_size"].first().reindex(pivot.index)
+    )
+
+    # Build the 'Total' row = simple mean of each column (across cohorts that reached that age)
+    total_row = pivot.mean(axis=0, skipna=True)
+    total_size = int(cohort_sizes.sum())
+
+    # Compose the display matrix with Total row pinned to top
+    display = pd.concat([pd.DataFrame([total_row], index=["Total"]), pivot.copy()])
+    sizes = pd.concat([pd.Series([total_size], index=["Total"]), cohort_sizes])
+    # Format cohort labels
+    display.index = ["Total"] + [pd.Timestamp(c).strftime("%b %Y") for c in pivot.index]
+    sizes.index = display.index
+
+    # Round to whole percentages for both the cell text and the hover
+    z = display.values.astype(float)
+    z_rounded = np.where(np.isnan(z), np.nan, np.round(z))
+    text = [
+        [f"{int(v)}%" if not np.isnan(v) else "" for v in row]
+        for row in z_rounded
+    ]
+
+    # Hover customdata: signup-cohort label + paid-starts size + integer retention
+    customdata = []
+    for cohort_label, size in zip(display.index, sizes.values):
+        customdata.append([[cohort_label, int(size)]] * display.shape[1])
+    customdata = np.array(customdata, dtype=object)
+
+    fig = go.Figure(go.Heatmap(
+        z=z_rounded,
+        x=[f"M{i}" for i in display.columns],
+        y=display.index,
+        colorscale="Purples",
+        zmin=0, zmax=100,
+        text=text,
+        texttemplate="%{text}",
+        textfont={"color": "white", "size": 12},
+        customdata=customdata,
+        hovertemplate=(
+            "Cohort: %{customdata[0]}<br>"
+            "Paid Starts: %{customdata[1]:,}<br>"
+            "Month: %{x}<br>"
+            "% still active: %{z:.0f}%<extra></extra>"
+        ),
+        colorbar=dict(title="% still<br>active"),
+    ))
+
+    # Two side-by-side visuals: the heatmap, plus a Paid Starts column on the left
     fig.update_layout(
-        title="Cohort retention — % of each signup-month cohort still paying, N months later",
-        height=560,
-        coloraxis_colorbar=dict(title="% still<br>active"),
+        title="Cohort retention — Total row + paid-start sizes (App Store Connect style)",
+        height=620,
+        xaxis=dict(side="top", title="Months since signup"),
+        yaxis=dict(autorange="reversed", title="Signup cohort"),
     )
     apply_plotly_theme(fig)
-    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+
+    # Side-by-side: paid-starts table on the left, heatmap on the right
+    col_left, col_right = st.columns([1, 5])
+    with col_left:
+        starts_df = pd.DataFrame({
+            "Cohort": display.index,
+            "Paid Starts": [f"{int(s):,}" for s in sizes.values],
+        })
+        st.markdown(" ")  # vertical alignment with heatmap title
+        st.dataframe(
+            starts_df, use_container_width=True, hide_index=True, height=600,
+        )
+    with col_right:
+        st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
     st.caption(
-        "Read down the diagonal: each row is one cohort aging from left to right. "
-        "If retention falls off a cliff at the same month-offset across cohorts, you've found a structural drop-off worth investigating."
+        "**Total row** = simple mean of each column across all cohorts that have reached that age. "
+        "**Paid Starts** = how many paying accounts the cohort had in its first month. "
+        "Read down the diagonal: each row is one cohort aging left to right."
     )
 
     st.divider()
@@ -96,7 +157,6 @@ def render() -> None:
     st.markdown("**Cohort survival curves**")
     curve_df = cap.copy()
     curve_df["cohort_label"] = pd.to_datetime(curve_df["cohort_month"]).dt.strftime("%b %Y")
-    # Show only every Nth cohort to avoid clutter — first, last, and quartiles
     cohorts_all = sorted(curve_df["cohort_month"].unique())
     if len(cohorts_all) > 8:
         step = max(1, len(cohorts_all) // 6)
@@ -108,6 +168,9 @@ def render() -> None:
         curve_df,
         x="months_since_signup", y="retained_pct", color="cohort_label",
         title="Retention curves by cohort",
+    )
+    fig2.update_traces(
+        hovertemplate="Cohort: %{fullData.name}<br>Month: M%{x}<br>% retained: %{y:.0f}%<extra></extra>"
     )
     fig2.update_layout(
         height=400,

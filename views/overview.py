@@ -26,9 +26,9 @@ def render() -> None:
     kpis = metrics.current_kpis(mrr, accounts, grads)
 
     kpi_row([
-        ("Monthly Proceeds (MRR)", fmt_money(kpis["current_mrr"]), None,
-         "Total recurring revenue across all active accounts in the latest month. "
-         "Sum of plan_mrr + usage_mrr."),
+        ("Monthly Proceeds", fmt_money(kpis["current_mrr"]), None,
+         "Monthly recurring revenue (MRR) — total recurring revenue across all active accounts "
+         "in the latest month. Sum of plan_mrr + usage_mrr."),
         ("ARPA", fmt_money(kpis["arpa"]), None,
          "Average Revenue Per Account = Total MRR ÷ Active accounts. "
          "Shows how much value each customer brings on average."),
