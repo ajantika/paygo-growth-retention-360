@@ -44,15 +44,18 @@ def _cell_color(v: float | None) -> str:
         # Future / not-yet-reached cell: very faint slate, no emphasis
         return "background-color: rgba(255, 255, 255, 0.03); color: #475569;"
 
-    vc = max(50.0, min(100.0, float(v)))
-    t = (vc - 50.0) / 50.0  # 0..1
-    t = t ** 0.5            # gamma — gives 60-80% values more visual room
+    # Real cohort-retention data clusters in 60-100%. Map to the actual data
+    # range, not the theoretical 0-100, so 60% gets the lightest tint and
+    # 100% gets the strongest — giving a full visible gradient.
+    vc = max(60.0, min(100.0, float(v)))
+    t = (vc - 60.0) / 40.0  # 0..1 across actual data range
+    t = t ** 0.65           # gamma so 80-95% values stretch visually
 
     H = 213                 # Apple-blue hue
-    S = 100 - t * 28        # 100% -> 72%   (slight desaturation at high)
-    L = 92 - t * 30         # 92%  -> 62%   (lightness DOWN as retention UP)
+    S = 100 - t * 25        # 100% -> 75%
+    L = 95 - t * 38         # 95%  -> 57%  (38-point spread, big visible jump)
 
-    # Dark slate text — Apple's convention. Readable down to L ~= 60.
+    # Dark slate text everywhere — Apple's convention, readable down to L~55
     return f"background-color: hsl({H}, {S:.0f}%, {L:.0f}%); color: #0F172A;"
 
 
