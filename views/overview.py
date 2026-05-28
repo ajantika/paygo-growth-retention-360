@@ -26,12 +26,23 @@ def render() -> None:
     kpis = metrics.current_kpis(mrr, accounts, grads)
 
     kpi_row([
-        ("Monthly Proceeds (MRR)", fmt_money(kpis["current_mrr"]), None),
-        ("ARPA", fmt_money(kpis["arpa"]), None),
-        ("Active accounts", f"{kpis['active_accounts']:,}", None),
-        ("NRR", fmt_pct(kpis["nrr"]), None),
-        ("GRR", fmt_pct(kpis["grr"]), None),
-        ("Tier conversion rate", fmt_pct(kpis["graduation_rate"]), None),
+        ("Monthly Proceeds (MRR)", fmt_money(kpis["current_mrr"]), None,
+         "Total recurring revenue across all active accounts in the latest month. "
+         "Sum of plan_mrr + usage_mrr."),
+        ("ARPA", fmt_money(kpis["arpa"]), None,
+         "Average Revenue Per Account = Total MRR ÷ Active accounts. "
+         "Shows how much value each customer brings on average."),
+        ("Active accounts", f"{kpis['active_accounts']:,}", None,
+         "Accounts with MRR > 0 in the latest month. Single canonical definition used everywhere in this app."),
+        ("NRR", fmt_pct(kpis["nrr"]), None,
+         "Net Revenue Retention. Of accounts active 12 months ago, what % of revenue is still here today — "
+         "INCLUDING organic expansion but EXCLUDING tier-conversion jumps. >100% = the existing base is growing on its own."),
+        ("GRR", fmt_pct(kpis["grr"]), None,
+         "Gross Revenue Retention. Same cohort as NRR, but no expansion credit — pure 'how much did we keep?'. "
+         "Always ≤ NRR. Healthy SaaS: 85-95%."),
+        ("Tier conversion rate", fmt_pct(kpis["graduation_rate"]), None,
+         "% of active accounts that have converted from PayGo to Enterprise. "
+         "Apple equivalent: indie developer → studio relationship."),
     ])
     st.caption(
         f"{kpis['active_enterprise_accounts']} accounts on Enterprise · "

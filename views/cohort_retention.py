@@ -16,8 +16,8 @@ from lib.theme import PLOTLY_CONFIG, apply_plotly_theme, fmt_pct, kpi_row, page_
 def render() -> None:
     page_header(
         "Cohort Retention",
-        "How long do accounts stick around? Signup-month cohorts × months-since-signup. "
-        "The shape of this matrix is the truest signal of product-market fit.",
+        "How long do accounts stick around after they sign up? "
+        "All percentages on this page mean: **of the accounts that signed up in month X, what % are still paying us N months later?**",
     )
 
     accounts = dl.load_accounts()
@@ -29,7 +29,6 @@ def render() -> None:
         return
 
     # ---- Headline retention KPIs ----
-    # Average retention at months 1, 3, 6, 12 across cohorts that have reached that age
     def cohort_retention_at(month_offset: int) -> float:
         sub = cr[cr["months_since_signup"] == month_offset]
         return float(sub["retained_pct"].mean()) if not sub.empty else 0.0
@@ -40,14 +39,20 @@ def render() -> None:
     m12 = cohort_retention_at(12)
 
     kpi_row([
-        ("Month 1 retention", fmt_pct(m1), None),
-        ("Month 3 retention", fmt_pct(m3), None),
-        ("Month 6 retention", fmt_pct(m6), None),
-        ("Month 12 retention", fmt_pct(m12), None),
+        ("Month 1 retention", fmt_pct(m1), None,
+         "Of all signup cohorts that have lived ≥1 month, the average % of accounts still active 1 month after signup."),
+        ("Month 3 retention", fmt_pct(m3), None,
+         "Of all signup cohorts that have lived ≥3 months, the average % of accounts still active 3 months after signup."),
+        ("Month 6 retention", fmt_pct(m6), None,
+         "Of all signup cohorts that have lived ≥6 months, the average % of accounts still active 6 months after signup. "
+         "Typically the most diagnostic — onboarding effects are gone."),
+        ("Month 12 retention", fmt_pct(m12), None,
+         "Of all signup cohorts that have lived ≥12 months, the average % of accounts still active 12 months after signup. "
+         "Long-term anchor; equivalent to GRR cohort math."),
     ])
     st.caption(
-        "Each KPI is the mean across all cohorts that have reached that age. "
-        "The heatmap below shows cohort-by-cohort detail."
+        "Each KPI is the **average across cohorts** that have reached that age. "
+        "Heatmap below shows cohort-by-cohort detail — pick a row to follow one cohort across its life."
     )
 
     st.divider()
@@ -66,16 +71,16 @@ def render() -> None:
         pivot.values,
         x=pivot.columns,
         y=pivot.index,
-        labels=dict(x="Months since signup", y="Cohort", color="Retention %"),
+        labels=dict(x="Months since signup", y="Signup cohort", color="% still active"),
         color_continuous_scale="Purples",
         zmin=0, zmax=100,
         aspect="auto",
         text_auto=".0f",
     )
     fig.update_layout(
-        title="Cohort retention (% of signup-month cohort still active)",
+        title="Cohort retention — % of each signup-month cohort still paying, N months later",
         height=560,
-        coloraxis_colorbar=dict(title="%"),
+        coloraxis_colorbar=dict(title="% still<br>active"),
     )
     apply_plotly_theme(fig)
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)

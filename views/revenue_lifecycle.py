@@ -20,6 +20,27 @@ def render() -> None:
         "The MRR bridge — every dollar accounted for, every month. Tier conversion broken out separately.",
     )
 
+    with st.expander("ℹ️ What do these categories mean?"):
+        st.markdown(
+            """
+            Every account, every month, gets exactly one of these labels — and the bridge sums to zero error.
+
+            | Category | Definition |
+            |---|---|
+            | **Starting MRR** | Total recurring revenue at the end of the prior month. |
+            | **New** | Account paying for the first time ever this month. |
+            | **Expansion** | Account was already paying; MRR went up within the same segment (no tier change). |
+            | **Reactivation** | Account had churned in the past, came back paying this month. |
+            | **Tier conversion** | Account moved PayGo → Enterprise this month. Any MRR jump from the tier change is reported here, **not** as expansion — keeps NRR honest. |
+            | **Contraction** | Account was paying; MRR went down but stayed > 0. |
+            | **Churn** | Account was paying last month; MRR dropped to $0 this month. |
+            | **Ending MRR** | Total recurring revenue at the end of this month. |
+
+            **Identity:** `Starting + New + Expansion + Reactivation + Tier conversion − Contraction − Churn = Ending`.
+            The check below should always be ~0 to the cent.
+            """
+        )
+
     mrr = dl.load_mrr_monthly()
     bridge = metrics.movement_bridge(mrr)
     summary = metrics.monthly_bridge_summary(bridge)

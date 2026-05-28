@@ -35,11 +35,19 @@ def render() -> None:
     )
 
     kpi_row([
-        ("Total PayGo signups", f"{total:,}", None),
-        ("Converted to Enterprise", f"{graduated:,}", f"{grad_rate:.0f}%"),
-        ("Churned before converting", f"{churned_before_grad:,}", None),
-        ("Median time-to-convert", f"{int(median_ttu)} days", None),
-        ("Median MRR jump", f"{avg_jump:.1f}x", None),
+        ("Total PayGo signups", f"{total:,}", None,
+         "Every account that has ever signed up as PayGo, ever. Denominator for the conversion rate."),
+        ("Converted to Enterprise", f"{graduated:,}", f"{grad_rate:.0f}%",
+         "Accounts that moved PayGo → Enterprise at some point. The % delta = conversion rate."),
+        ("Churned before converting", f"{churned_before_grad:,}", None,
+         "Accounts that left while still on PayGo, before they had a chance to convert. "
+         "Each one is a missed Enterprise opportunity."),
+        ("Median time-to-convert", f"{int(median_ttu)} days", None,
+         "Median days between first PayGo payment and Enterprise conversion. "
+         "Tells you the typical 'time to land an Enterprise deal' for self-serve customers."),
+        ("Median MRR jump", f"{avg_jump:.1f}x", None,
+         "Median multiple between pre-conversion PayGo MRR and post-conversion Enterprise MRR. "
+         "Shows how much bigger the contract gets at conversion."),
     ])
 
     st.divider()

@@ -65,14 +65,26 @@ def render() -> None:
     n_products = int(ctx["products"]["product"].nunique()) if not ctx["products"].empty else 0
     status = "Active" if account_row["is_active"] else "Churned"
 
+    # Split into 2 rows so 'Enterprise' / 'Business' aren't truncated by narrow columns
     kpi_row([
-        ("Segment", str(account_row["current_segment"]), None),
-        ("Subtier", str(account_row.get("paygo_subtier", "—")), None),
-        ("Tenure", f"{tenure_months} mo", None),
-        ("Latest MRR", fmt_money(latest_mrr), None),
-        ("Peak MRR", fmt_money(peak_mrr), None),
-        ("Products", f"{n_products}", None),
-        ("Status", status, None),
+        ("Segment", str(account_row["current_segment"]), None,
+         "PayGo (self-serve, pay-as-you-go) or Enterprise (contracted, negotiated). "
+         "Accounts move PayGo → Enterprise via tier conversion."),
+        ("Subtier", str(account_row.get("paygo_subtier", "—")), None,
+         "PayGo plan tier: Free ($0 plan), Pro ($20/mo plan), or Business ($200/mo plan). "
+         "Each tier has its own usage-MRR ceiling."),
+        ("Tenure", f"{tenure_months} mo", None,
+         "Months between first paying month and the latest month in the dataset."),
+        ("Status", status, None,
+         "Active = still paying. Churned = MRR went to $0 at some point and never came back."),
+    ])
+    kpi_row([
+        ("Latest MRR", fmt_money(latest_mrr), None,
+         "Monthly recurring revenue in the most recent month for this account. plan_mrr + usage_mrr."),
+        ("Peak MRR", fmt_money(peak_mrr), None,
+         "Highest single-month MRR this account has ever recorded."),
+        ("Products", f"{n_products}", None,
+         "Distinct products this account has ever subscribed to (entry product + later adoptions)."),
     ])
 
     st.divider()

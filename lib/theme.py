@@ -58,12 +58,22 @@ def page_header(title: str, subtitle: str | None = None) -> None:
         st.caption(subtitle)
 
 
-def kpi_row(items: list[tuple[str, str, str | None]]) -> None:
-    """Render a row of KPI cards. items = [(label, value, delta), ...]."""
+def kpi_row(items) -> None:
+    """Render a row of KPI cards.
+
+    Each item is a tuple:
+      (label, value)                            — just label + value
+      (label, value, delta)                     — adds delta
+      (label, value, delta, help_text)          — adds hover tooltip with definition
+    """
     cols = st.columns(len(items))
-    for col, (label, value, delta) in zip(cols, items):
+    for col, item in zip(cols, items):
+        label = item[0]
+        value = item[1]
+        delta = item[2] if len(item) > 2 else None
+        help_text = item[3] if len(item) > 3 else None
         with col:
-            st.metric(label=label, value=value, delta=delta if delta else None)
+            st.metric(label=label, value=value, delta=delta if delta else None, help=help_text)
 
 
 def demo_banner() -> None:

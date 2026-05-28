@@ -27,12 +27,24 @@ def render() -> None:
     reason_df = summary["by_reason"]
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Logo churn rate (all-time)", fmt_pct(summary["logo_churn_rate"]))
+    col1.metric(
+        "Logo churn rate (all-time)", fmt_pct(summary["logo_churn_rate"]),
+        help="Logo = an account. Logo churn = % of all accounts ever signed up that have churned. "
+             "Distinct from revenue churn (which weighs accounts by their MRR).",
+    )
     if not plan_df.empty:
         monthly_rate = plan_df.set_index("plan_type").loc["Monthly", "churn_rate_pct"] if "Monthly" in plan_df["plan_type"].values else 0
         annual_rate = plan_df.set_index("plan_type").loc["Annual", "churn_rate_pct"] if "Annual" in plan_df["plan_type"].values else 0
-        col2.metric("Monthly plan churn", f"{monthly_rate:.0f}%")
-        col3.metric("Annual plan churn", f"{annual_rate:.0f}%")
+        col2.metric(
+            "Monthly plan churn", f"{monthly_rate:.0f}%",
+            help="% of accounts on the Monthly billing plan that have churned. "
+                 "Higher than annual because there's no commitment.",
+        )
+        col3.metric(
+            "Annual plan churn", f"{annual_rate:.0f}%",
+            help="% of accounts on the Annual billing plan that have churned. "
+                 "Typically much lower than Monthly — the headline retention insight.",
+        )
 
     st.info(
         f"**Headline insight.** Annual plans churn at **{annual_rate:.0f}%** versus **{monthly_rate:.0f}%** for monthly — "
