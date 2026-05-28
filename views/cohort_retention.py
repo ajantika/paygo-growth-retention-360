@@ -24,13 +24,27 @@ MAX_MONTHS = 12
 # ---------- Cell-color helper ----------
 
 def _cell_color(v: float | None) -> str:
-    """Map a 0..100 retention value to a purple-tinted background."""
+    """Map a retention % to a lavender background — with visible steps.
+
+    Real cohort-retention data clusters in 60-100%, so we clamp to [50, 100]
+    and stretch that across a wide alpha range with a mild gamma. Each 10%
+    band reads as a distinct shade.
+    """
     if v is None or (isinstance(v, float) and np.isnan(v)):
-        return "background-color: transparent; color: #94A3B8;"
-    # Map 0..100 to alpha 0.10..0.85 over the lavender accent
-    a = 0.10 + (max(0.0, min(100.0, v)) / 100.0) * 0.75
-    # Text color: white on darker cells, slate on faint cells
-    text = "#FFFFFF" if v >= 35 else "#E2E8F0"
+        return "background-color: transparent; color: #475569;"
+
+    # Clamp the data range where retention values actually live
+    vc = max(50.0, min(100.0, float(v)))
+    t = (vc - 50.0) / 50.0  # 0..1
+
+    # Gamma < 1 boosts mid-range so 70% vs 80% vs 90% read as clearly different
+    t = t ** 0.65
+
+    # Wide alpha range: very faint at the low end, near-solid at 100%
+    a = 0.06 + t * 0.84
+
+    # Text contrast — white on darker cells, soft slate on faint cells
+    text = "#FFFFFF" if t > 0.30 else "#CBD5E1"
     return f"background-color: rgba(167,139,250,{a:.2f}); color: {text};"
 
 
