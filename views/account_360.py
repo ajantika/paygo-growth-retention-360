@@ -12,10 +12,9 @@ from lib.theme import PALETTE, PLOTLY_CONFIG, apply_plotly_theme, fmt_money, kpi
 
 
 def render() -> None:
-    page_header(
-        "Account 360",
-        "Pick an account to see its full lifecycle — products, MRR trajectory, events.",
-    )
+    # Reserve a slot for the title at the very top — we'll fill it in
+    # AFTER the account is selected so the header shows the actual ID.
+    header_slot = st.container()
 
     accounts = dl.load_accounts()
     mrr = dl.load_mrr_monthly()
@@ -43,6 +42,12 @@ def render() -> None:
         filtered = filtered[~filtered["is_active"]]
 
     if filtered.empty:
+        # Fill the reserved title slot even on the empty path so the page isn't headless
+        with header_slot:
+            page_header(
+                "Account 360",
+                "No accounts match those filters — relax one of them.",
+            )
         st.warning("No accounts match those filters.")
         return
 
@@ -55,6 +60,17 @@ def render() -> None:
         options=filtered["account_id"].tolist(),
         index=filtered["account_id"].tolist().index(default_id),
     )
+
+    # Now that we know which account is selected, fill the reserved title slot
+    # so the page header reads "Account 360 — A01518" instead of just "Account 360".
+    total_accounts = len(accounts)
+    filtered_count = len(filtered)
+    with header_slot:
+        page_header(
+            f"Account 360 — {account_id}",
+            f"Showing 1 of {filtered_count:,} accounts matching the filters above "
+            f"(out of {total_accounts:,} total). Full lifecycle below: products, MRR trajectory, events.",
+        )
 
     account_row = accounts[accounts["account_id"] == account_id].iloc[0]
     ctx = metrics.account_timeline(account_id, mrr, subs, churn, grads)
