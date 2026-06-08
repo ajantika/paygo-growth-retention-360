@@ -15,7 +15,7 @@ from lib.theme import (
 
 def render() -> None:
     page_header(
-        "PayGo Growth & Retention 360",
+        "Customer Analytics & Lifecycle",
         "Self-serve partner reporting — monthly proceeds, retention, and tier conversion in one place.",
     )
 

@@ -1,4 +1,4 @@
-"""PayGo Growth & Retention 360 — Streamlit entry point.
+"""Customer Analytics & Lifecycle — Streamlit entry point.
 
 Sibling project to Customer 360 / Product 360. Same st.navigation
 multi-page layout, same metric vocabulary (MRR, regions, channels).
@@ -22,7 +22,7 @@ from views import (
 
 def main() -> None:
     st.set_page_config(
-        page_title="PayGo Growth & Retention 360",
+        page_title="Customer Analytics & Lifecycle",
         page_icon="📈",
         layout="wide",
     )
